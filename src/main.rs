@@ -2,7 +2,19 @@ use clap::{Arg, Command};
 use regex::Regex;
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{self, BufRead, BufReader};
+
+fn process_lines<T: BufRead + Sized>(reader: T, re: Regex) -> Result<(), Box<dyn Error>> {
+    for (i, line) in reader.lines().enumerate() {
+        let line = line?;
+        let line_num = i + 1;
+        if let Some(_) = re.find(&line) {
+            println!("{}: {}", line_num, line);
+        }
+    }
+
+    Ok(())
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = Command::new("gep-lite")
@@ -28,19 +40,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         .expect("Missing pattern");
     let re = Regex::new(pattern)?;
 
-    let file = matches
+    let input = matches
         .get_one::<String>("input")
         .expect("Missing input file");
-    let f = File::open(file)?;
-    let reader = BufReader::new(f);
 
-    for (i, line) in reader.lines().enumerate() {
-        let line = line?;
-        let line_num = i + 1;
-        if let Some(_) = re.find(&line) {
-            println!("{}: {}", line_num, line);
-        }
+    if input == "-" {
+        let stdin = io::stdin();
+        let reader = stdin.lock();
+        process_lines(reader, re)
+    } else {
+        let f = File::open(input)?;
+        let reader = BufReader::new(f);
+        process_lines(reader, re)
     }
-
-    Ok(())
 }
